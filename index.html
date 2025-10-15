@@ -1,213 +1,239 @@
-document.addEventListener("DOMContentLoaded", () => {
-  console.log("🚀 Travel Helper listo");
-  attachEvents(document);
-});
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Travel Helper - Asistente del Viajero</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>🧭 Travel Helper — Asistente del Viajero</h1>
+      <div class="meta">Sin registro • APIs públicas</div>
+    </header>
 
-// Reutilizable: agrega listeners a una raíz (document o modal)
-function attachEvents(root) {
-  if (root.__initialized) return;
-  root.__initialized = true;
+    <div class="grid">
+      <!-- 1) Cotizador USD -> ARS -->
+      <div class="card" id="card-cotizador">
+        <div class="card-summary">
+          <div class="card-title">
+            <div class="icon">💵</div>
+            <strong>Cotizador (USD → ARS)</strong>
+          </div>
+          <div class="desc">Convierte rápido USD a ARS usando exchangerate.host</div>
+          <div class="card-action">
+            <button class="open-modal" aria-controls="modal">Abrir</button>
+          </div>
+        </div>
 
-  // ----------------------------
-  // 💵 COTIZADOR USD → ARS
-  // ----------------------------
-  const cotBtn = root.querySelector("#cot_btn");
-  const cotMonto = root.querySelector("#cot_monto");
-  const cotOut = root.querySelector("#cot_out");
-  if (cotBtn) {
-    cotBtn.addEventListener("click", async () => {
-      const val = parseFloat(cotMonto.value);
-      if (!val || val < 1 || val > 1000) {
-        cotOut.textContent = "Ingrese un monto entre 1 y 1000";
-        return;
-      }
-      try {
-        const res = await fetch("https://api.exchangerate.host/latest?base=USD&symbols=ARS");
-        const data = await res.json();
-        const tasa = data.rates.ARS;
-        cotOut.textContent = `${val} USD = ${(val * tasa).toFixed(2)} ARS`;
-      } catch {
-        cotOut.textContent = "Error al obtener cotización";
-      }
-    });
-  }
+        <div class="card-details" aria-hidden="true">
+          <label for="cot_monto">Monto en USD (1 - 1000)</label>
+          <input id="cot_monto" type="number" min="1" max="1000" value="100" />
+          <button id="cot_btn">Convertir a ARS</button>
+          <div class="out" id="cot_out">—</div>
+          <small>Fuente: exchangerate.host (sin clave)</small>
+        </div>
+      </div>
 
-  // ----------------------------
-  // 💰 CALCULADORA DE PROPINAS
-  // ----------------------------
-  const propBtn = root.querySelector("#prop_btn");
-  if (propBtn) {
-    propBtn.addEventListener("click", () => {
-      const total = parseFloat(root.querySelector("#prop_total").value);
-      const pct = parseFloat(root.querySelector("#prop_pct").value);
-      const propOut = root.querySelector("#prop_out");
-      if (!total || total <= 0) return propOut.textContent = "Ingrese un monto válido";
-      const propina = (total * pct / 100).toFixed(2);
-      const final = (total + parseFloat(propina)).toFixed(2);
-      propOut.textContent = `Propina: ${propina} | Total: ${final}`;
-    });
-  }
+      <!-- 2) Calculadora de propinas -->
+      <div class="card" id="card-propina">
+        <div class="card-summary">
+          <div class="card-title">
+            <div class="icon">💰</div>
+            <strong>Calculadora de propinas</strong>
+          </div>
+          <div class="desc">Calcula propina en moneda local según porcentaje</div>
+          <div class="card-action">
+            <button class="open-modal">Abrir</button>
+          </div>
+        </div>
 
-  // ----------------------------
-  // ⏰ CONVERSOR DE ZONA HORARIA
-  // ----------------------------
-  const tzOrigen = root.querySelector("#tz_origen");
-  const tzDestino = root.querySelector("#tz_destino");
-  const tzBtn = root.querySelector("#tz_btn");
-  const tzOut = root.querySelector("#tz_out");
+        <div class="card-details" aria-hidden="true">
+          <label for="prop_total">Monto de la cuenta (moneda local)</label>
+          <input id="prop_total" type="number" placeholder="Ej: 5000" />
+          <label for="prop_pct">Porcentaje (%)</label>
+          <input id="prop_pct" type="number" value="10" />
+          <button id="prop_btn">Calcular</button>
+          <div class="out" id="prop_out">—</div>
+          <small>Sugerencias: 5-10% (países que no usan costumbre de propina), 10-20% (común en restaurantes)</small>
+        </div>
+      </div>
 
-  // Rellena selects con zonas comunes
-  const zonas = [
-    "America/Buenos_Aires", "America/New_York", "Europe/Madrid",
-    "Europe/London", "Asia/Tokyo", "Australia/Sydney", "America/Mexico_City",
-    "America/Santiago", "Europe/Berlin", "Africa/Johannesburg"
-  ];
-  if (tzOrigen && tzOrigen.options.length === 0) {
-    zonas.forEach(z => {
-      tzOrigen.add(new Option(z, z));
-      tzDestino.add(new Option(z, z));
-    });
-    tzOrigen.value = "America/Buenos_Aires";
-    tzDestino.value = "Europe/Madrid";
-  }
+      <!-- 3) Conversor de zona horaria -->
+      <div class="card" id="card-zona">
+        <div class="card-summary">
+          <div class="card-title">
+            <div class="icon">⏰</div>
+            <strong>Conversor de zona horaria</strong>
+          </div>
+          <div class="desc">Convierte horas entre zonas tipo 'America/...' (worldtimeapi)</div>
+          <div class="card-action">
+            <button class="open-modal">Abrir</button>
+          </div>
+        </div>
 
-  if (tzBtn) {
-    tzBtn.addEventListener("click", async () => {
-      const o = tzOrigen.value;
-      const d = tzDestino.value;
-      try {
-        const [r1, r2] = await Promise.all([
-          fetch(`https://worldtimeapi.org/api/timezone/${o}`),
-          fetch(`https://worldtimeapi.org/api/timezone/${d}`)
-        ]);
-        const t1 = await r1.json();
-        const t2 = await r2.json();
-        const h1 = new Date(t1.datetime).toLocaleTimeString();
-        const h2 = new Date(t2.datetime).toLocaleTimeString();
-        tzOut.textContent = `${o.split("/")[1]}: ${h1} | ${d.split("/")[1]}: ${h2}`;
-      } catch {
-        tzOut.textContent = "Error al obtener la hora";
-      }
-    });
-  }
+        <div class="card-details" aria-hidden="true">
+          <label>Hora local (detectada por defecto):</label>
+          <input id="tz_local_time" type="time" />
+          <div class="row" style="margin-top:8px">
+            <div class="half">
+              <label>Zona origen</label>
+              <select id="tz_origen"></select>
+            </div>
+            <div class="half">
+              <label>Zona destino</label>
+              <select id="tz_destino"></select>
+            </div>
+          </div>
+          <button id="tz_btn">Convertir hora</button>
+          <div class="out" id="tz_out">—</div>
+          <small>Se usan zonas tipo 'America/...' (apoya worldtimeapi.org)</small>
+        </div>
+      </div>
 
-  // ----------------------------
-  // 📏 CONVERSOR DE MEDIDAS
-  // ----------------------------
-  const convBtn = root.querySelector("#conv_btn");
-  const convOut = root.querySelector("#conv_out");
-  if (convBtn) {
-    convBtn.addEventListener("click", () => {
-      const val = parseFloat(root.querySelector("#conv_val").value);
-      const tipo = root.querySelector("#conv_tipo").value;
-      if (isNaN(val)) return convOut.textContent = "Ingrese un número válido";
+      <!-- 4) Conversor de medidas -->
+      <div class="card" id="card-medidas">
+        <div class="card-summary">
+          <div class="card-title">
+            <div class="icon">📏</div>
+            <strong>Conversor de medidas</strong>
+          </div>
+          <div class="desc">Convierte entre km/miles, kg/lbs y °C/°F</div>
+          <div class="card-action">
+            <button class="open-modal">Abrir</button>
+          </div>
+        </div>
 
-      let res;
-      switch (tipo) {
-        case "km_miles": res = val * 0.621371; break;
-        case "miles_km": res = val / 0.621371; break;
-        case "kg_lbs": res = val * 2.20462; break;
-        case "lbs_kg": res = val / 2.20462; break;
-        case "c_f": res = (val * 9 / 5) + 32; break;
-        case "f_c": res = (val - 32) * 5 / 9; break;
-        default: res = val;
-      }
-      convOut.textContent = `Resultado: ${res.toFixed(2)}`;
-    });
-  }
+        <div class="card-details" aria-hidden="true">
+          <label for="conv_val">Valor</label>
+          <input id="conv_val" type="number" value="1" />
+          <label for="conv_tipo">Conversión</label>
+          <select id="conv_tipo">
+            <option value="km_miles">Kilómetros → Millas</option>
+            <option value="miles_km">Millas → Kilómetros</option>
+            <option value="kg_lbs">Kilogramos → Libras</option>
+            <option value="lbs_kg">Libras → Kilogramos</option>
+            <option value="c_f">°C → °F</option>
+            <option value="f_c">°F → °C</option>
+          </select>
+          <button id="conv_btn">Convertir</button>
+          <div class="out" id="conv_out">—</div>
+        </div>
+      </div>
 
-  // ----------------------------
-  // ☀️ CLIMA
-  // ----------------------------
-  const climaBtn = root.querySelector("#clima_btn");
-  const climaOut = root.querySelector("#clima_out");
-  if (climaBtn) {
-    climaBtn.addEventListener("click", async () => {
-      let city = root.querySelector("#city_clima").value.trim();
-      if (!city) return climaOut.textContent = "Ingrese una ciudad";
-      city = city.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-      try {
-        const res = await fetch(`https://wttr.in/${city}?format=3`);
-        const txt = await res.text();
-        climaOut.textContent = txt;
-      } catch {
-        climaOut.textContent = "Error al obtener clima";
-      }
-    });
-  }
+      <!-- 5) Clima actual (wttr.in) -->
+      <div class="card" id="card-clima">
+        <div class="card-summary">
+          <div class="card-title">
+            <div class="icon">☀️</div>
+            <strong>Clima rápido</strong>
+          </div>
+          <div class="desc">Consulta el clima en texto simple desde wttr.in</div>
+          <div class="card-action">
+            <button class="open-modal">Abrir</button>
+          </div>
+        </div>
 
-  // ----------------------------
-  // 💸 PRESUPUESTO DIARIO
-  // ----------------------------
-  const presBtn = root.querySelector("#pres_btn");
-  if (presBtn) {
-    presBtn.addEventListener("click", () => {
-      const total = parseFloat(root.querySelector("#pres_total").value);
-      const dias = parseInt(root.querySelector("#pres_days").value);
-      const out = root.querySelector("#pres_out");
-      if (!total || !dias) return out.textContent = "Complete ambos campos";
-      out.textContent = `Podés gastar ${(total / dias).toFixed(2)} por día`;
-    });
-  }
+        <div class="card-details" aria-hidden="true">
+          <label for="city_clima">Ciudad (ej: Buenos Aires)</label>
+          <input id="city_clima" type="text" placeholder="Ej: Buenos Aires" />
+          <button id="clima_btn">Ver clima</button>
+          <div class="out" id="clima_out">—</div>
+          <small>Fuente: wttr.in (texto simple)</small>
+        </div>
+      </div>
 
-  // ----------------------------
-  // 🔢 DIVISOR DE CUENTA
-  // ----------------------------
-  const splitBtn = root.querySelector("#split_btn");
-  if (splitBtn) {
-    splitBtn.addEventListener("click", () => {
-      const total = parseFloat(root.querySelector("#split_total").value);
-      const people = parseInt(root.querySelector("#split_people").value);
-      const out = root.querySelector("#split_out");
-      if (!total || !people) return out.textContent = "Ingrese ambos valores";
-      out.textContent = `Cada persona paga ${(total / people).toFixed(2)}`;
-    });
-  }
+      <!-- 6) Presupuesto diario -->
+      <div class="card" id="card-presupuesto">
+        <div class="card-summary">
+          <div class="card-title">
+            <div class="icon">💸</div>
+            <strong>Presupuesto diario</strong>
+          </div>
+          <div class="desc">Divide tu dinero total entre los días del viaje</div>
+          <div class="card-action">
+            <button class="open-modal">Abrir</button>
+          </div>
+        </div>
 
-  // ----------------------------
-  // 💬 FRASES ÚTILES
-  // ----------------------------
-  const frases = {
-    en: ["Where is the bathroom?", "Thank you", "How much does it cost?"],
-    pt: ["Onde fica o banheiro?", "Obrigado", "Quanto custa?"],
-    fr: ["Où sont les toilettes?", "Merci", "Combien ça coûte?"],
-    es: ["¿Dónde está el baño?", "Gracias", "¿Cuánto cuesta?"]
-  };
-  const fraseBtn = root.querySelector("#frase_btn");
-  if (fraseBtn) {
-    fraseBtn.addEventListener("click", () => {
-      const lang = root.querySelector("#lang_frase").value;
-      const out = root.querySelector("#frase_out");
-      const arr = frases[lang] || [];
-      out.textContent = arr[Math.floor(Math.random() * arr.length)];
-    });
-  }
+        <div class="card-details" aria-hidden="true">
+          <label for="pres_total">Dinero total (moneda local)</label>
+          <input id="pres_total" type="number" placeholder="Ej: 100000" />
+          <label for="pres_days">Días de viaje</label>
+          <input id="pres_days" type="number" value="7" />
+          <button id="pres_btn">Calcular por día</button>
+          <div class="out" id="pres_out">—</div>
+        </div>
+      </div>
 
-  // ----------------------------
-  // 🔹 MODAL (detalles expandibles)
-  // ----------------------------
-  const modal = document.getElementById("modal");
-  const modalBody = document.getElementById("modal-body");
-  const modalClose = document.getElementById("modal-close");
-  const openButtons = root.querySelectorAll(".open-modal");
+      <!-- 7) Divisor de cuenta -->
+      <div class="card" id="card-split">
+        <div class="card-summary">
+          <div class="card-title">
+            <div class="icon">🔢</div>
+            <strong>Divisor de cuenta</strong>
+          </div>
+          <div class="desc">Divide un total entre varias personas</div>
+          <div class="card-action">
+            <button class="open-modal">Abrir</button>
+          </div>
+        </div>
 
-  openButtons.forEach(btn => {
-    btn.addEventListener("click", e => {
-      const card = e.target.closest(".card");
-      const title = card.querySelector(".card-title strong").textContent;
-      const details = card.querySelector(".card-details").cloneNode(true);
-      modalBody.innerHTML = "";
-      modalBody.appendChild(details);
-      document.getElementById("modal-title").textContent = title;
-      modal.style.display = "flex";
-      attachEvents(details);
-    });
-  });
+        <div class="card-details" aria-hidden="true">
+          <label for="split_total">Total (moneda local)</label>
+          <input id="split_total" type="number" />
+          <label for="split_people">Cantidad de personas</label>
+          <input id="split_people" type="number" value="2" min="1" />
+          <button id="split_btn">Dividir</button>
+          <div class="out" id="split_out">—</div>
+        </div>
+      </div>
 
-  if (modalClose) {
-    modalClose.addEventListener("click", () => (modal.style.display = "none"));
-  }
-  modal?.addEventListener("click", e => {
-    if (e.target === modal) modal.style.display = "none";
-  });
-}
+      <!-- 8) Frases útiles -->
+      <div class="card" id="card-frases">
+        <div class="card-summary">
+          <div class="card-title">
+            <div class="icon">💬</div>
+            <strong>Frases útiles</strong>
+          </div>
+          <div class="desc">Frases cortas y prácticas para viajeros</div>
+          <div class="card-action">
+            <button class="open-modal">Abrir</button>
+          </div>
+        </div>
+
+        <div class="card-details" aria-hidden="true">
+          <label for="lang_frase">Idioma</label>
+          <select id="lang_frase">
+            <option value="en">Inglés</option>
+            <option value="pt">Portugués</option>
+            <option value="fr">Francés</option>
+            <option value="es">Español</option>
+          </select>
+          <button id="frase_btn">Mostrar frases</button>
+          <div class="out" id="frase_out">—</div>
+          <small>Frases cortas y prácticas para viajeros</small>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      Recomendación: si ves la página en blanco o las funciones externas no responden, servila con Python o súbela a Netlify (evita bloqueos CORS).
+    </footer>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-backdrop" id="modal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal" role="document">
+      <header>
+        <strong id="modal-title">Detalle</strong>
+        <button class="close" id="modal-close">Cerrar</button>
+      </header>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
