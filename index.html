@@ -1,0 +1,213 @@
+document.addEventListener("DOMContentLoaded", () => {
+  console.log("🚀 Travel Helper listo");
+  attachEvents(document);
+});
+
+// Reutilizable: agrega listeners a una raíz (document o modal)
+function attachEvents(root) {
+  if (root.__initialized) return;
+  root.__initialized = true;
+
+  // ----------------------------
+  // 💵 COTIZADOR USD → ARS
+  // ----------------------------
+  const cotBtn = root.querySelector("#cot_btn");
+  const cotMonto = root.querySelector("#cot_monto");
+  const cotOut = root.querySelector("#cot_out");
+  if (cotBtn) {
+    cotBtn.addEventListener("click", async () => {
+      const val = parseFloat(cotMonto.value);
+      if (!val || val < 1 || val > 1000) {
+        cotOut.textContent = "Ingrese un monto entre 1 y 1000";
+        return;
+      }
+      try {
+        const res = await fetch("https://api.exchangerate.host/latest?base=USD&symbols=ARS");
+        const data = await res.json();
+        const tasa = data.rates.ARS;
+        cotOut.textContent = `${val} USD = ${(val * tasa).toFixed(2)} ARS`;
+      } catch {
+        cotOut.textContent = "Error al obtener cotización";
+      }
+    });
+  }
+
+  // ----------------------------
+  // 💰 CALCULADORA DE PROPINAS
+  // ----------------------------
+  const propBtn = root.querySelector("#prop_btn");
+  if (propBtn) {
+    propBtn.addEventListener("click", () => {
+      const total = parseFloat(root.querySelector("#prop_total").value);
+      const pct = parseFloat(root.querySelector("#prop_pct").value);
+      const propOut = root.querySelector("#prop_out");
+      if (!total || total <= 0) return propOut.textContent = "Ingrese un monto válido";
+      const propina = (total * pct / 100).toFixed(2);
+      const final = (total + parseFloat(propina)).toFixed(2);
+      propOut.textContent = `Propina: ${propina} | Total: ${final}`;
+    });
+  }
+
+  // ----------------------------
+  // ⏰ CONVERSOR DE ZONA HORARIA
+  // ----------------------------
+  const tzOrigen = root.querySelector("#tz_origen");
+  const tzDestino = root.querySelector("#tz_destino");
+  const tzBtn = root.querySelector("#tz_btn");
+  const tzOut = root.querySelector("#tz_out");
+
+  // Rellena selects con zonas comunes
+  const zonas = [
+    "America/Buenos_Aires", "America/New_York", "Europe/Madrid",
+    "Europe/London", "Asia/Tokyo", "Australia/Sydney", "America/Mexico_City",
+    "America/Santiago", "Europe/Berlin", "Africa/Johannesburg"
+  ];
+  if (tzOrigen && tzOrigen.options.length === 0) {
+    zonas.forEach(z => {
+      tzOrigen.add(new Option(z, z));
+      tzDestino.add(new Option(z, z));
+    });
+    tzOrigen.value = "America/Buenos_Aires";
+    tzDestino.value = "Europe/Madrid";
+  }
+
+  if (tzBtn) {
+    tzBtn.addEventListener("click", async () => {
+      const o = tzOrigen.value;
+      const d = tzDestino.value;
+      try {
+        const [r1, r2] = await Promise.all([
+          fetch(`https://worldtimeapi.org/api/timezone/${o}`),
+          fetch(`https://worldtimeapi.org/api/timezone/${d}`)
+        ]);
+        const t1 = await r1.json();
+        const t2 = await r2.json();
+        const h1 = new Date(t1.datetime).toLocaleTimeString();
+        const h2 = new Date(t2.datetime).toLocaleTimeString();
+        tzOut.textContent = `${o.split("/")[1]}: ${h1} | ${d.split("/")[1]}: ${h2}`;
+      } catch {
+        tzOut.textContent = "Error al obtener la hora";
+      }
+    });
+  }
+
+  // ----------------------------
+  // 📏 CONVERSOR DE MEDIDAS
+  // ----------------------------
+  const convBtn = root.querySelector("#conv_btn");
+  const convOut = root.querySelector("#conv_out");
+  if (convBtn) {
+    convBtn.addEventListener("click", () => {
+      const val = parseFloat(root.querySelector("#conv_val").value);
+      const tipo = root.querySelector("#conv_tipo").value;
+      if (isNaN(val)) return convOut.textContent = "Ingrese un número válido";
+
+      let res;
+      switch (tipo) {
+        case "km_miles": res = val * 0.621371; break;
+        case "miles_km": res = val / 0.621371; break;
+        case "kg_lbs": res = val * 2.20462; break;
+        case "lbs_kg": res = val / 2.20462; break;
+        case "c_f": res = (val * 9 / 5) + 32; break;
+        case "f_c": res = (val - 32) * 5 / 9; break;
+        default: res = val;
+      }
+      convOut.textContent = `Resultado: ${res.toFixed(2)}`;
+    });
+  }
+
+  // ----------------------------
+  // ☀️ CLIMA
+  // ----------------------------
+  const climaBtn = root.querySelector("#clima_btn");
+  const climaOut = root.querySelector("#clima_out");
+  if (climaBtn) {
+    climaBtn.addEventListener("click", async () => {
+      let city = root.querySelector("#city_clima").value.trim();
+      if (!city) return climaOut.textContent = "Ingrese una ciudad";
+      city = city.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      try {
+        const res = await fetch(`https://wttr.in/${city}?format=3`);
+        const txt = await res.text();
+        climaOut.textContent = txt;
+      } catch {
+        climaOut.textContent = "Error al obtener clima";
+      }
+    });
+  }
+
+  // ----------------------------
+  // 💸 PRESUPUESTO DIARIO
+  // ----------------------------
+  const presBtn = root.querySelector("#pres_btn");
+  if (presBtn) {
+    presBtn.addEventListener("click", () => {
+      const total = parseFloat(root.querySelector("#pres_total").value);
+      const dias = parseInt(root.querySelector("#pres_days").value);
+      const out = root.querySelector("#pres_out");
+      if (!total || !dias) return out.textContent = "Complete ambos campos";
+      out.textContent = `Podés gastar ${(total / dias).toFixed(2)} por día`;
+    });
+  }
+
+  // ----------------------------
+  // 🔢 DIVISOR DE CUENTA
+  // ----------------------------
+  const splitBtn = root.querySelector("#split_btn");
+  if (splitBtn) {
+    splitBtn.addEventListener("click", () => {
+      const total = parseFloat(root.querySelector("#split_total").value);
+      const people = parseInt(root.querySelector("#split_people").value);
+      const out = root.querySelector("#split_out");
+      if (!total || !people) return out.textContent = "Ingrese ambos valores";
+      out.textContent = `Cada persona paga ${(total / people).toFixed(2)}`;
+    });
+  }
+
+  // ----------------------------
+  // 💬 FRASES ÚTILES
+  // ----------------------------
+  const frases = {
+    en: ["Where is the bathroom?", "Thank you", "How much does it cost?"],
+    pt: ["Onde fica o banheiro?", "Obrigado", "Quanto custa?"],
+    fr: ["Où sont les toilettes?", "Merci", "Combien ça coûte?"],
+    es: ["¿Dónde está el baño?", "Gracias", "¿Cuánto cuesta?"]
+  };
+  const fraseBtn = root.querySelector("#frase_btn");
+  if (fraseBtn) {
+    fraseBtn.addEventListener("click", () => {
+      const lang = root.querySelector("#lang_frase").value;
+      const out = root.querySelector("#frase_out");
+      const arr = frases[lang] || [];
+      out.textContent = arr[Math.floor(Math.random() * arr.length)];
+    });
+  }
+
+  // ----------------------------
+  // 🔹 MODAL (detalles expandibles)
+  // ----------------------------
+  const modal = document.getElementById("modal");
+  const modalBody = document.getElementById("modal-body");
+  const modalClose = document.getElementById("modal-close");
+  const openButtons = root.querySelectorAll(".open-modal");
+
+  openButtons.forEach(btn => {
+    btn.addEventListener("click", e => {
+      const card = e.target.closest(".card");
+      const title = card.querySelector(".card-title strong").textContent;
+      const details = card.querySelector(".card-details").cloneNode(true);
+      modalBody.innerHTML = "";
+      modalBody.appendChild(details);
+      document.getElementById("modal-title").textContent = title;
+      modal.style.display = "flex";
+      attachEvents(details);
+    });
+  });
+
+  if (modalClose) {
+    modalClose.addEventListener("click", () => (modal.style.display = "none"));
+  }
+  modal?.addEventListener("click", e => {
+    if (e.target === modal) modal.style.display = "none";
+  });
+}
