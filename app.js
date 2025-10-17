@@ -1,200 +1,232 @@
+// Esperar a que el DOM esté listo
 document.addEventListener("DOMContentLoaded", () => {
+  const openButtons = document.querySelectorAll(".open-modal");
   const modal = document.getElementById("modal");
-  const modalBody = document.getElementById("modal-body");
-  const modalTitle = document.getElementById("modal-title");
-  const closeBtn = document.getElementById("modal-close");
+  const modalContent = document.querySelector(".modal-content");
+  const closeModalBtn = document.getElementById("close-modal");
 
-  // === Apertura del modal ===
-  document.querySelectorAll(".open-modal").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const card = e.target.closest(".card");
-      const title = card.querySelector("strong").textContent;
-      const content = card.querySelector(".card-details").innerHTML;
+  // === FUNCIONES AL ABRIR CADA MODAL ===
+  function inicializarFuncionesDelModal(modalBody) {
 
-      modalTitle.textContent = title;
-      modalBody.innerHTML = content;
-      modal.style.display = "flex";
-      modal.setAttribute("aria-hidden", "false");
-
-      inicializarFuncionesModal(); // 👈 activa funciones según el contenido cargado
-    });
-  });
-
-  // === Cierre del modal ===
-  closeBtn.addEventListener("click", cerrarModal);
-  modal.addEventListener("click", (e) => {
-    if (e.target === modal) cerrarModal();
-  });
-
-  function cerrarModal() {
-    modal.style.display = "none";
-    modal.setAttribute("aria-hidden", "true");
-  }
-
-  // ===============================
-  // Inicializa funciones del modal
-  // ===============================
-  function inicializarFuncionesModal() {
-
-    // --- Cotización USD/ARS ---
+    // === 1. COTIZADOR USD → ARS ===
     const cotBtn = modalBody.querySelector("#cot_btn");
     if (cotBtn) {
-      cotBtn.onclick = async () => {
-        const monto = parseFloat(modalBody.querySelector("#cot_monto").value);
-        const out = modalBody.querySelector("#cot_out");
-        out.textContent = "Cargando...";
+      const cotMonto = modalBody.querySelector("#cot_monto");
+      const cotOut = modalBody.querySelector("#cot_out");
+      cotBtn.addEventListener("click", async () => {
+        const monto = parseFloat(cotMonto.value);
+        if (isNaN(monto) || monto <= 0) {
+          cotOut.textContent = "Ingrese un monto válido.";
+          return;
+        }
+        cotOut.textContent = "Consultando...";
         try {
           const res = await fetch("https://api.exchangerate.host/latest?base=USD&symbols=ARS");
           const data = await res.json();
-          const tasa = data.rates.ARS;
-          out.textContent = `${monto} USD = ${(monto * tasa).toFixed(2)} ARS`;
-        } catch {
-          out.textContent = "Error al obtener cotización.";
+          const rate = data.rates.ARS;
+          cotOut.textContent = `${monto} USD = ${(monto * rate).toFixed(2)} ARS`;
+        } catch (e) {
+          cotOut.textContent = "Error al obtener cotización.";
         }
-      };
+      });
     }
 
-    // --- Propinas ---
+    // === 2. CALCULADORA DE PROPINAS ===
     const propBtn = modalBody.querySelector("#prop_btn");
     if (propBtn) {
-      propBtn.onclick = () => {
-        const total = parseFloat(modalBody.querySelector("#prop_total").value);
-        const pct = parseFloat(modalBody.querySelector("#prop_pct").value);
-        const out = modalBody.querySelector("#prop_out");
-        if (isNaN(total) || isNaN(pct)) {
-          out.textContent = "Complete ambos campos.";
+      const total = modalBody.querySelector("#prop_total");
+      const pct = modalBody.querySelector("#prop_pct");
+      const out = modalBody.querySelector("#prop_out");
+      propBtn.addEventListener("click", () => {
+        const monto = parseFloat(total.value);
+        const porcentaje = parseFloat(pct.value);
+        if (isNaN(monto) || isNaN(porcentaje)) {
+          out.textContent = "Ingrese valores válidos.";
           return;
         }
-        const propina = (total * pct) / 100;
-        out.textContent = `Propina sugerida: ${propina.toFixed(2)}`;
-      };
+        const propina = (monto * porcentaje) / 100;
+        out.textContent = `Propina: ${propina.toFixed(2)} — Total: ${(monto + propina).toFixed(2)}`;
+      });
     }
 
-    // --- Zonas horarias ---
-    const tzOrigen = modalBody.querySelector("#tz_origen");
-    const tzDestino = modalBody.querySelector("#tz_destino");
+    // === 3. CONVERSOR DE ZONA HORARIA ===
     const tzBtn = modalBody.querySelector("#tz_btn");
-    const tzOut = modalBody.querySelector("#tz_out");
+    if (tzBtn) {
+      const tzOut = modalBody.querySelector("#tz_out");
+      const tzOrigen = modalBody.querySelector("#tz_origen");
+      const tzDestino = modalBody.querySelector("#tz_destino");
+      const tzLocal = modalBody.querySelector("#tz_local_time");
 
-    if (tzOrigen && tzDestino && tzBtn) {
-      const zonas = [
-        "America/Argentina/Buenos_Aires",
-        "America/New_York",
-        "Europe/London",
-        "Europe/Paris",
-        "Asia/Tokyo",
-        "America/Mexico_City",
-        "America/Santiago",
-        "America/Lima",
-        "Australia/Sydney",
-      ];
-
-      // cargar opciones solo una vez
-      if (!tzOrigen.children.length) {
+      if (tzOrigen && tzOrigen.options.length === 0) {
+        const zonas = [
+          "America/Argentina/Buenos_Aires",
+          "America/New_York",
+          "Europe/London",
+          "Asia/Tokyo",
+          "Pacific/Auckland",
+          "America/Mexico_City",
+          "Europe/Madrid",
+          "America/Santiago",
+          "Asia/Dubai",
+          "America/Lima"
+        ];
         zonas.forEach((z) => {
           const opt1 = document.createElement("option");
           const opt2 = document.createElement("option");
           opt1.value = opt2.value = z;
-          opt1.textContent = opt2.textContent = z.replaceAll("_", " ");
+          opt1.textContent = opt2.textContent = z;
           tzOrigen.appendChild(opt1);
-          tzDestino.appendChild(opt2);
+          tzDestino.appendChild(opt2.cloneNode(true));
         });
         tzOrigen.value = "America/Argentina/Buenos_Aires";
         tzDestino.value = "Europe/London";
       }
 
-      tzBtn.onclick = async () => {
-        const origen = tzOrigen.value;
-        const destino = tzDestino.value;
-        const horaLocal = modalBody.querySelector("#tz_local_time").value;
-
-        if (!horaLocal) {
-          tzOut.textContent = "Ingrese una hora.";
-          return;
-        }
-
+      tzBtn.addEventListener("click", () => {
         try {
-          const [res1, res2] = await Promise.all([
-            fetch(`https://worldtimeapi.org/api/timezone/${origen}`),
-            fetch(`https://worldtimeapi.org/api/timezone/${destino}`),
-          ]);
-          const data1 = await res1.json();
-          const data2 = await res2.json();
+          const hora = tzLocal.value;
+          const [h, m] = hora.split(":");
+          const fecha = new Date();
+          fecha.setHours(h);
+          fecha.setMinutes(m);
 
-          const [h, m] = horaLocal.split(":").map(Number);
-          const toMins = (t) => {
-            const sign = t[0] === "-" ? -1 : 1;
-            const [hh, mm] = t.slice(1).split(":").map(Number);
-            return sign * (hh * 60 + mm);
+          const zonaDestino = tzDestino.value;
+          const options = {
+            timeZone: zonaDestino,
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
           };
 
-          const diff = toMins(data2.utc_offset) - toMins(data1.utc_offset);
-          let total = h * 60 + m + diff;
-          total = ((total % 1440) + 1440) % 1440;
-          const newH = Math.floor(total / 60).toString().padStart(2, "0");
-          const newM = (total % 60).toString().padStart(2, "0");
-
-          tzOut.textContent = `En ${destino.replaceAll("_", " ")} son las ${newH}:${newM}`;
-        } catch {
+          const horaConvertida = new Intl.DateTimeFormat("es-AR", options).format(fecha);
+          tzOut.textContent = `Hora en ${zonaDestino}: ${horaConvertida}`;
+        } catch (e) {
           tzOut.textContent = "Error al convertir hora.";
         }
-      };
+      });
     }
 
-    // --- Frases ---
-    const fraseBtn = modalBody.querySelector("#frase_btn");
-    if (fraseBtn) {
-      const frases = {
-        en: [
-          { frase: "How are you today?", significado: "¿Cómo estás hoy?" },
-          { frase: "Where is the airport?", significado: "¿Dónde está el aeropuerto?" },
-          { frase: "Can you help me?", significado: "¿Puedes ayudarme?" },
-          { frase: "I need a doctor", significado: "Necesito un médico" },
-        ],
-        es: [
-          { frase: "¿Dónde está el baño?", significado: "Where is the bathroom?" },
-          { frase: "Necesito ayuda urgente", significado: "I need urgent help" },
-          { frase: "¿Cuánto cuesta esto?", significado: "How much is this?" },
-          { frase: "Me siento muy bien", significado: "I feel very good" },
-        ],
-        pt: [
-          { frase: "Onde fica o hotel?", significado: "¿Dónde queda el hotel?" },
-          { frase: "Quanto isso custa?", significado: "¿Cuánto cuesta eso?" },
-          { frase: "Preciso de um médico", significado: "Necesito un médico" },
-          { frase: "Pode me ajudar?", significado: "¿Puedes ayudarme?" },
-        ],
-        fr: [
-          { frase: "Où est la gare?", significado: "¿Dónde está la estación?" },
-          { frase: "Combien ça coûte?", significado: "¿Cuánto cuesta?" },
-          { frase: "Je ne parle pas bien", significado: "No hablo bien" },
-          { frase: "Pouvez-vous m'aider?", significado: "¿Puede ayudarme?" },
-        ],
-      };
-
-      fraseBtn.onclick = () => {
-        const lang = modalBody.querySelector("#lang_frase").value;
-        const out = modalBody.querySelector("#frase_out");
-        const arr = frases[lang];
-        const aleatoria = arr[Math.floor(Math.random() * arr.length)];
-        out.innerHTML = `<strong>${aleatoria.frase}</strong><br><small>${aleatoria.significado}</small>`;
-      };
+    // === 4. CONVERSOR DE MEDIDAS ===
+    const convBtn = modalBody.querySelector("#conv_btn");
+    if (convBtn) {
+      const convVal = modalBody.querySelector("#conv_val");
+      const convTipo = modalBody.querySelector("#conv_tipo");
+      const convOut = modalBody.querySelector("#conv_out");
+      convBtn.addEventListener("click", () => {
+        const val = parseFloat(convVal.value);
+        let res;
+        switch (convTipo.value) {
+          case "km_miles": res = val * 0.621371; break;
+          case "miles_km": res = val / 0.621371; break;
+          case "kg_lbs": res = val * 2.20462; break;
+          case "lbs_kg": res = val / 2.20462; break;
+          case "c_f": res = (val * 9) / 5 + 32; break;
+          case "f_c": res = ((val - 32) * 5) / 9; break;
+        }
+        convOut.textContent = `Resultado: ${res.toFixed(2)}`;
+      });
     }
 
-    // --- Presupuesto diario ---
-    const presBtn = modalBody.querySelector("#pres_btn");
-    if (presBtn) {
-      presBtn.onclick = () => {
-        const total = parseFloat(modalBody.querySelector("#pres_total").value);
-        const dias = parseInt(modalBody.querySelector("#pres_days").value);
-        const out = modalBody.querySelector("#pres_out");
-        if (!total || !dias) {
-          out.textContent = "Complete ambos campos.";
+    // === 5. CLIMA ===
+    const climaBtn = modalBody.querySelector("#clima_btn");
+    if (climaBtn) {
+      const cityInput = modalBody.querySelector("#city_clima");
+      const climaOut = modalBody.querySelector("#clima_out");
+      climaBtn.addEventListener("click", async () => {
+        const ciudad = cityInput.value.trim();
+        if (!ciudad) {
+          climaOut.textContent = "Ingrese una ciudad.";
           return;
         }
-        out.textContent = `Podés gastar ${(total / dias).toFixed(2)} por día.`;
-      };
+        climaOut.textContent = "Consultando clima...";
+        try {
+          const res = await fetch(`https://wttr.in/${ciudad}?format=j1`);
+          const data = await res.json();
+          const cond = data.current_condition[0];
+          climaOut.textContent = `🌡️ ${cond.temp_C}°C, ${cond.weatherDesc[0].value}. Sensación: ${cond.FeelsLikeC}°C.`;
+        } catch (err) {
+          climaOut.textContent = "Error al obtener el clima.";
+        }
+      });
+    }
+
+    // === 6. PRESUPUESTO DIARIO ===
+    const presBtn = modalBody.querySelector("#pres_btn");
+    if (presBtn) {
+      const presTotal = modalBody.querySelector("#pres_total");
+      const presDays = modalBody.querySelector("#pres_days");
+      const presOut = modalBody.querySelector("#pres_out");
+      presBtn.addEventListener("click", () => {
+        const total = parseFloat(presTotal.value);
+        const days = parseInt(presDays.value);
+        if (isNaN(total) || isNaN(days) || days <= 0) {
+          presOut.textContent = "Ingrese valores válidos.";
+          return;
+        }
+        const diario = total / days;
+        presOut.textContent = `Puedes gastar ${diario.toFixed(2)} por día.`;
+      });
+    }
+
+    // === 7. DIVISOR DE CUENTA ===
+    const splitBtn = modalBody.querySelector("#split_btn");
+    if (splitBtn) {
+      const total = modalBody.querySelector("#split_total");
+      const people = modalBody.querySelector("#split_people");
+      const out = modalBody.querySelector("#split_out");
+      splitBtn.addEventListener("click", () => {
+        const t = parseFloat(total.value);
+        const p = parseInt(people.value);
+        if (isNaN(t) || isNaN(p) || p <= 0) {
+          out.textContent = "Ingrese valores válidos.";
+          return;
+        }
+        out.textContent = `Cada persona paga: ${(t / p).toFixed(2)}`;
+      });
+    }
+
+    // === 8. FRASES ÚTILES ===
+    const fraseBtn = modalBody.querySelector("#frase_btn");
+    if (fraseBtn) {
+      const fraseOut = modalBody.querySelector("#frase_out");
+      fraseBtn.addEventListener("click", () => {
+        const frases = [
+          ["Time flies so fast", "El tiempo pasa rápido"],
+          ["Travel broadens mind", "Viajar abre la mente"],
+          ["Collect moments not things", "Colecciona momentos, no cosas"],
+          ["Dream explore discover live", "Sueña, explora, descubre, vive"],
+          ["Adventure awaits brave souls", "La aventura espera a los valientes"],
+        ];
+        const f = frases[Math.floor(Math.random() * frases.length)];
+        fraseOut.textContent = `"${f[0]}" → ${f[1]}`;
+      });
     }
   }
+
+  // === ABRIR MODAL ===
+  openButtons.forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const card = e.target.closest(".card");
+      const details = card.querySelector(".card-details").innerHTML;
+
+      modalContent.innerHTML = details;
+      modal.classList.add("show");
+
+      // Llamamos a las funciones dentro del modal
+      inicializarFuncionesDelModal(modalContent);
+    });
+  });
+
+  // === CERRAR MODAL (botón o click afuera) ===
+  closeModalBtn.addEventListener("click", () => {
+    modal.classList.remove("show");
+    modalContent.innerHTML = "";
+  });
+
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      modal.classList.remove("show");
+      modalContent.innerHTML = "";
+    }
+  });
 });
-
-
